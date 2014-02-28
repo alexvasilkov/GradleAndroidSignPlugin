@@ -1,4 +1,6 @@
 apply plugin: 'groovy'
+apply plugin: 'maven'
+apply plugin: 'signing'
 
 dependencies {
     compile gradleApi()
@@ -6,4 +8,103 @@ dependencies {
 }
 
 group = 'com.alexvasilkov'
-version = '1.0-SNAPSHOT'
+version = '0.1'
+ext.packaging = 'jar'
+
+def isDevBuild
+def isCiBuild
+def isReleaseBuild
+
+def sonatypeRepositoryUrl
+
+//set build variables based on build type (release, continuous integration, development)
+if(hasProperty("release")) {
+    isReleaseBuild = true
+    sonatypeRepositoryUrl = "https://oss.sonatype.org/service/local/staging/deploy/maven2/"
+} else if (hasProperty("ci")) {
+    isCiBuild = true
+    version += "-SNAPSHOT"
+    sonatypeRepositoryUrl = "https://oss.sonatype.org/content/repositories/snapshots/"
+} else {
+    isDevBuild = true
+}
+
+
+task groovydocJar(type: Jar, dependsOn: groovydoc) {
+    classifier = 'javadoc'
+    from 'build/docs/groovydoc'
+}
+ 
+task sourcesJar(type: Jar) {
+    from sourceSets.main.allSource
+    classifier = 'sources'
+}
+
+artifacts {
+    archives jar
+    archives groovydocJar
+    archives sourcesJar
+}
+
+//********* artifact signing *********
+if(isReleaseBuild) {
+    signing {
+        sign configurations.archives
+    }
+} else {
+    task signArchives {
+        // do nothing
+    }
+}
+
+uploadArchives {
+    repositories {
+        if (isDevBuild) {
+            mavenLocal()
+        } else {
+            mavenDeployer {
+                if (isReleaseBuild) {
+                    beforeDeployment { MavenDeployment deployment -> signing.signPom(deployment) }
+                }
+
+                repository(url: sonatypeRepositoryUrl) {
+                    authentication(userName: sonatypeUsername, password: sonatypePassword)
+                }
+
+                pom.artifactId = 'android_sign'
+
+                pom.project {
+                    name 'AndroidGradleSignPlugin'
+                    packaging 'jar'
+                    description 'AndroidGradleSignPlugin is a Gradle plugin for signing Android app with release keystore using command line prompt'
+                    url 'https://github.com/alexvasilkov/AndroidGradleSignPlugin'
+
+                    scm {
+                        url 'scm:git@github.com:GradleFx/GradleFx.git'
+                        connection 'scm:git:git://github.com/alexvasilkov/AndroidGradleSignPlugin.git'
+                        developerConnection 'scm:git@github.com:alexvasilkov/AndroidGradleSignPlugin.git'
+                    }
+
+                    issueManagement {
+                        system 'GitHub Issues'
+                        url 'https://github.com/alexvasilkov/AndroidGradleSignPlugin/issues'
+                    }
+
+                    licenses {
+                        license {
+                            name 'Apache 2.0'
+                            url 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+                        }
+                    }
+
+                    developers {
+                        developer {
+                            id 'alexvasilkov'
+                            name 'Alex Vasilkov'
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
