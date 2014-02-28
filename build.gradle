@@ -80,7 +80,7 @@ uploadArchives {
                     url 'https://github.com/alexvasilkov/AndroidGradleSignPlugin'
 
                     scm {
-                        url 'scm:git@github.com:GradleFx/GradleFx.git'
+                        url 'scm:git@github.com:alexvasilkov/AndroidGradleSignPlugin.git'
                         connection 'scm:git:git://github.com/alexvasilkov/AndroidGradleSignPlugin.git'
                         developerConnection 'scm:git@github.com:alexvasilkov/AndroidGradleSignPlugin.git'
                     }
