@@ -13,7 +13,7 @@ In build.gradle file add following lines:
         }
         dependencies {
             classpath 'com.android.tools.build:gradle:0.7.+'
-            classpath 'com.alexvasilkov:android_sign:0.1'
+            classpath 'com.alexvasilkov:android_sign:0.2'
         }
     }
     
