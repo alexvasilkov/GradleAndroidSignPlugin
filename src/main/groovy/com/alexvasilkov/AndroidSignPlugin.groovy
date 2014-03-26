@@ -25,33 +25,33 @@ class AndroidSignPlugin implements Plugin<Project> {
                     pack: true, // We need to pack the dialog (so it will take the size of it's children)
                     show: true // Let's show it
                 ) {
-					panel(constraints: BorderLayout.CENTER) {
-						tableLayout(cellpadding: 4) {
-							tr {
-								td {
-									label(text: "Keystore password:")
-								}
-								td {
-									passwordField(columns: 20, id: 'inputKeystore')
-								}
-							}
-							tr {
-								td {
-									label(text: "Key password:")
-								}
-								td {
-									passwordField(columns: 20, id: 'inputKey')
-								}
-							}
-						}
-					}
-					panel(constraints: BorderLayout.SOUTH) {
-						button(defaultButton: true, text: "Ok", actionPerformed: {
-							keystorePw = inputKeystore.password;
-							keyPw = inputKey.password;
-							dispose(); // Close dialog
-						})
-					}
+                    panel(constraints: BorderLayout.CENTER) {
+                        tableLayout(cellpadding: 4) {
+                            tr {
+                                td {
+                                    label(text: "Keystore password:")
+                                }
+                                td {
+                                    passwordField(columns: 20, id: 'inputKeystore')
+                                }
+                            }
+                            tr {
+                                td {
+                                    label(text: "Key password:")
+                                }
+                                td {
+                                    passwordField(columns: 20, id: 'inputKey')
+                                }
+                            }
+                        }
+                    }
+                    panel(constraints: BorderLayout.SOUTH) {
+                        button(defaultButton: true, text: "Ok", actionPerformed: {
+                            keystorePw = inputKeystore.password;
+                            keyPw = inputKey.password;
+                            dispose(); // Close dialog
+                        })
+                    }
                 } // dialog end
             } else {
                 keystorePw = System.console().readPassword("\nKeystore password: ")
