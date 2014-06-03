@@ -1,81 +1,64 @@
 package com.alexvasilkov
 
-import org.gradle.api.Project
 import org.gradle.api.Plugin
-import groovy.swing.SwingBuilder
-import java.awt.*
+import org.gradle.api.Project
 
 class AndroidSignPlugin implements Plugin<Project> {
     void apply(Project project) {
-        def passwordsAssigned = false
+        project.configure(project) {
+            if (project.hasProperty('android') && project.android.hasProperty('signingConfigs')) {
+                tasks.whenTaskAdded { theTask ->
+                    boolean flavorFound = false
 
-        project.task('askForPasswords') << {
-            if (passwordsAssigned) return
-            
-            def keystorePw = ''
-            def keyPw = ''
-
-            if(System.console() == null) {
-                new SwingBuilder().dialog(
-                    modal: true, // Otherwise the build will continue running before you closed the dialog
-                    title: 'Enter passwords', // Dialog title
-                    alwaysOnTop: true, // pretty much what the name says
-                    resizable: false, // Don't allow the user to resize the dialog
-                    locationRelativeTo: null, // Place dialog in center of the screen
-                    pack: true, // We need to pack the dialog (so it will take the size of it's children)
-                    show: true // Let's show it
-                ) {
-                    panel(constraints: BorderLayout.CENTER) {
-                        tableLayout(cellpadding: 4) {
-                            tr {
-                                td {
-                                    label(text: "Keystore password:")
-                                }
-                                td {
-                                    passwordField(columns: 20, id: 'inputKeystore')
-                                }
-                            }
-                            tr {
-                                td {
-                                    label(text: "Key password:")
-                                }
-                                td {
-                                    passwordField(columns: 20, id: 'inputKey')
-                                }
-                            }
+                    android.productFlavors.all { theFlavor ->
+                        String flavorName = theFlavor.name
+                        if (!flavorFound && theTask.name ==~ /package${flavorName}Release/) {
+                            theTask.dependsOn addPasswordsTask(project, flavorName)
+                            flavorFound = true
                         }
                     }
-                    panel(constraints: BorderLayout.SOUTH) {
-                        button(defaultButton: true, text: "Ok", actionPerformed: {
-                            keystorePw = inputKeystore.password;
-                            keyPw = inputKey.password;
-                            dispose(); // Close dialog
-                        })
-                    }
-                } // dialog end
-            } else {
-                keystorePw = System.console().readPassword("\nKeystore password: ")
-                keyPw = System.console().readPassword("Key password: ")
-            }
 
-            project.android.signingConfigs.release.storePassword = new String(keystorePw)
-            project.android.signingConfigs.release.keyPassword = new String(keyPw)
-
-            passwordsAssigned = true
-        }
-
-        project.configure(project) {
-            if (it.hasProperty("android")) {
-                tasks.whenTaskAdded { theTask ->
-                    if ((theTask.name ==~ /package.*Release/)
-                            && it.android.hasProperty("signingConfigs")
-                            && it.android.signingConfigs.hasProperty("release")) {
-                        it.android.signingConfigs.release.storePassword = "-"
-                        it.android.signingConfigs.release.keyPassword = "-"
-                        theTask.dependsOn "askForPasswords"
+                    if (!flavorFound && theTask.name ==~ /packageRelease/) {
+                        theTask.dependsOn addPasswordsTask(project, null)
                     }
                 }
             }
         }
     }
+
+    static String addPasswordsTask(Project project, String flavorName) {
+        final String taskName = flavorName == null ? "Release" : flavorName
+        final String fullTaskName = "askForPasswords${taskName}"
+        final String configName = flavorName == null ? "release" : flavorName
+
+        def final config = project.android.signingConfigs[configName];
+
+        config.storePassword = '-'
+        config.keyPassword = '-'
+
+        project.task(fullTaskName) << {
+            if (!project.android.signingConfigs.hasProperty(configName)) {
+                println "Project does not contain \"${configName}\" config under \"android.signingConfigs.${configName}\""
+                return
+            }
+
+            char[] storePass = ''
+            char[] keyPass = ''
+
+            if (System.console() == null) {
+                println "Cannot read passwords: System.console() is not available"
+            } else {
+                System.console().println("\nKeystore file: ${config.storeFile.getPath()}");
+                storePass = System.console().readPassword("\n${taskName} keystore password:\n")
+                keyPass = System.console().readPassword("${taskName} password for key \"${config.keyAlias}\"" +
+                        " (leave empty if same as keystore password):\n")
+            }
+
+            config.storePassword = new String(storePass)
+            config.keyPassword = keyPass == null || keyPass.length == 0 ? new String(storePass) : new String(keyPass)
+        }
+
+        return fullTaskName
+    }
+
 }
