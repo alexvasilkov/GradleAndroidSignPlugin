@@ -14,8 +14,8 @@ In build.gradle file add following lines:
             mavenCentral()
         }
         dependencies {
-            classpath 'com.android.tools.build:gradle:0.7.+'
-            classpath 'com.alexvasilkov:android-sign-release:0.3.6'
+            classpath 'com.android.tools.build:gradle:0.x.+'
+            classpath 'com.alexvasilkov:android-sign-release:0.3.7'
         }
     }
     

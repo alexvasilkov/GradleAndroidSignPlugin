@@ -11,7 +11,7 @@ class AndroidSignPlugin implements Plugin<Project> {
                     boolean flavorFound = false
 
                     android.productFlavors.all { theFlavor ->
-                        String flavorName = theFlavor.name
+                        String flavorName = theFlavor.name.capitalize()
                         if (!flavorFound && theTask.name ==~ /package${flavorName}Release/) {
                             theTask.dependsOn addPasswordsTask(project, flavorName)
                             flavorFound = true
