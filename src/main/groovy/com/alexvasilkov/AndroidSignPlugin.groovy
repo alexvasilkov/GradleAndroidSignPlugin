@@ -13,8 +13,8 @@ class AndroidSignPlugin implements Plugin<Project> {
                     boolean flavorFound = false
 
                     android.productFlavors.all { theFlavor ->
-                        String flavorName = theFlavor.name.capitalize()
-                        if (!flavorFound && theTask.name ==~ /package${flavorName}Release/) {
+                        String flavorName = theFlavor.name
+                        if (!flavorFound && theTask.name ==~ /package${flavorName.capitalize()}Release/) {
                             theTask.dependsOn addPasswordsTask(project, flavorName)
                             flavorFound = true
                         }
@@ -31,15 +31,29 @@ class AndroidSignPlugin implements Plugin<Project> {
     static String addPasswordsTask(Project project, String flavorName) {
         final String taskName = flavorName == null ? "Release" : flavorName
         final String fullTaskName = "askForPasswords${taskName}"
-        final String configName = flavorName == null ? "release" : flavorName
 
-        def final config = project.android.signingConfigs[configName];
+        final String configName
+        final config
 
-        config.storePassword = '-'
-        config.keyPassword = '-'
+        if (flavorName != null && project.android.signingConfigs.hasProperty(flavorName)) {
+            configName = flavorName
+            config = project.android.signingConfigs[configName]
+        } else {
+            configName = "release"
+            if (project.android.signingConfigs.hasProperty(configName)) {
+                config = project.android.signingConfigs[configName]
+            } else {
+                config = null
+            }
+        }
+
+        if (config != null) {
+            config.storePassword = '-'
+            config.keyPassword = '-'
+        }
 
         project.task(fullTaskName) << {
-            if (!project.android.signingConfigs.hasProperty(configName)) {
+            if (config == null) {
                 println "Project does not contain \"${configName}\" config under \"android.signingConfigs.${configName}\""
                 return
             }
