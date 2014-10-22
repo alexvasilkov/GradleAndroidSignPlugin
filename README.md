@@ -14,8 +14,8 @@ In build.gradle file add following lines:
             mavenCentral()
         }
         dependencies {
-            classpath 'com.android.tools.build:gradle:0.x.+'
-            classpath 'com.alexvasilkov:android-sign-release:0.3.7'
+            classpath 'com.android.tools.build:gradle:x.x.x'
+            classpath 'com.alexvasilkov:android-sign-release:x.x.x'
         }
     }
     
@@ -41,11 +41,11 @@ For multiple flavors use:
 
     android {
         signingConfigs {
-            flavor1 {
+            flavor1Release {
                 storeFile file('{your_release_keystore1}')
                 keyAlias '{release_keystore_alias1}'
             }
-            flavor2 {
+            flavor2Release {
                 storeFile file('{your_release_keystore2}')
                 keyAlias '{release_keystore_alias2}'
             }
@@ -55,15 +55,19 @@ For multiple flavors use:
             release {
                 productFlavors {
                     flavor1 {
-                        signingConfig signingConfigs.flavor1
+                        signingConfig signingConfigs.flavor1Release
                     }
                     flavor2 {
-                        signingConfig signingConfigs.flavor2
+                        signingConfig signingConfigs.flavor2Release
                     }
                 }
             }
         }
     }
 
+In general for each build variant with flavor "flavor" and build type "type",
+plugin will look for signing configs in this order: "flavorType", "flavor", "type".
+If signing config is found and it is not a debug signing config than plugin will ask for passwords.
 
-Then you can build release apk with `gradlew -aR`, it will be generated to `build/apk/*-release.apk`
+You can build release apk with `gradlew -assembleRelease`, it will be generated to
+`build/outputs/apk/*.apk`

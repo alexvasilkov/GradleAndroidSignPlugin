@@ -1,63 +1,73 @@
 package com.alexvasilkov
-
+import groovy.swing.SwingBuilder
 import org.gradle.api.Plugin
 import org.gradle.api.Project
-import groovy.swing.SwingBuilder
-import java.awt.Component
 
 class AndroidSignPlugin implements Plugin<Project> {
     void apply(Project project) {
         project.configure(project) {
             if (project.hasProperty('android') && project.android.hasProperty('signingConfigs')) {
                 tasks.whenTaskAdded { theTask ->
-                    boolean flavorFound = false
+                    if (!theTask.name.startsWith('package')) return;
 
-                    android.productFlavors.all { theFlavor ->
-                        String flavorName = theFlavor.name
-                        if (!flavorFound && theTask.name ==~ /package${flavorName.capitalize()}Release/) {
-                            theTask.dependsOn addPasswordsTask(project, flavorName)
-                            flavorFound = true
+                    // We should try all build variants - combinations of flavor and build type
+                    android.buildTypes.all { theType ->
+                        String typeName = theType.name
+                        String typeNameCapitalized = typeName.capitalize()
+                        String newTaskName = null
+
+                        android.productFlavors.all { theFlavor ->
+                            String flavorName = theFlavor.name
+                            if (theTask.name ==~ /package${flavorName.capitalize()}${typeNameCapitalized}/) {
+                                newTaskName = addPasswordsTask(project, typeName, flavorName)
+                            }
                         }
-                    }
 
-                    if (!flavorFound && theTask.name ==~ /packageRelease/) {
-                        theTask.dependsOn addPasswordsTask(project, null)
+                        if (theTask.name ==~ /package${typeNameCapitalized}/) {
+                            newTaskName = addPasswordsTask(project, typeName, null)
+                        }
+
+                        if (newTaskName != null) theTask.dependsOn newTaskName
                     }
                 }
             }
         }
     }
 
-    static String addPasswordsTask(Project project, String flavorName) {
-        final String taskName = flavorName == null ? "Release" : flavorName
+    static String addPasswordsTask(Project project, String typeName, String flavorName) {
+        final String taskName = (flavorName == null ? "" : flavorName.capitalize()) + typeName.capitalize()
         final String fullTaskName = "askForPasswords${taskName}"
 
+        final configs = project.android.signingConfigs
+
         final String configName
-        final config
 
-        if (flavorName != null && project.android.signingConfigs.hasProperty(flavorName)) {
+        if (flavorName != null && configs.hasProperty(flavorName + typeName.capitalize())) {
+            configName = flavorName + typeName.capitalize()
+        } else if (flavorName != null && configs.hasProperty(flavorName)) {
             configName = flavorName
-            config = project.android.signingConfigs[configName]
+        } else if (configs.hasProperty(typeName)) {
+            configName = typeName
         } else {
-            configName = "release"
-            if (project.android.signingConfigs.hasProperty(configName)) {
-                config = project.android.signingConfigs[configName]
-            } else {
-                config = null
-            }
+            configName = null
         }
 
-        if (config != null) {
-            config.storePassword = '-'
-            config.keyPassword = '-'
+        if ("debug".equals(configName)) {
+            return null; // No need to ask for passwords for debug keystore
         }
+
+        final config = configName == null ? null : configs[configName]
+
+        if (config == null) {
+            println "Project does not contain config for ${taskName} " +
+                    "under \"android.signingConfigs.${taskName}\""
+            return null;
+        }
+
+        config.storePassword = '-'
+        config.keyPassword = '-'
 
         project.task(fullTaskName) << {
-            if (config == null) {
-                println "Project does not contain \"${configName}\" config under \"android.signingConfigs.${configName}\""
-                return
-            }
-
             char[] storePass = ''
             char[] keyPass = ''
 

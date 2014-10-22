@@ -8,7 +8,7 @@ dependencies {
 }
 
 group = 'com.alexvasilkov'
-version = '0.5'
+version = '0.7'
 ext.packaging = 'jar'
 
 def isDevBuild
