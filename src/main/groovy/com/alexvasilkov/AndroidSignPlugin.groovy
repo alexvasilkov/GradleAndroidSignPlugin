@@ -1,117 +1,81 @@
 package com.alexvasilkov
-import groovy.swing.SwingBuilder
+
+import com.android.build.gradle.AppPlugin
+import com.android.build.gradle.api.ApplicationVariant
+import com.android.builder.model.SigningConfig
 import org.gradle.api.Plugin
 import org.gradle.api.Project
+import org.gradle.api.Task
+import org.gradle.api.tasks.StopExecutionException
 
 class AndroidSignPlugin implements Plugin<Project> {
+
+    private static final String DEBUG = "debug"
+
+    @Override
     void apply(Project project) {
-        project.configure(project) {
-            if (project.hasProperty('android') && project.android.hasProperty('signingConfigs')) {
-                tasks.whenTaskAdded { theTask ->
-                    if (!theTask.name.startsWith('package')) return;
+        if (!project.plugins.hasPlugin(AppPlugin)) {
+            throw new StopExecutionException("'android' plugin has to be applied before")
+        }
 
-                    // We should try all build variants - combinations of flavor and build type
-                    android.buildTypes.all { theType ->
-                        String typeName = theType.name
-                        String typeNameCapitalized = typeName.capitalize()
-                        String newTaskName = null
+        boolean isConfigsFixed = false
 
-                        android.productFlavors.all { theFlavor ->
-                            String flavorName = theFlavor.name
-                            if (theTask.name ==~ /package${flavorName.capitalize()}${typeNameCapitalized}/) {
-                                newTaskName = addPasswordsTask(project, typeName, flavorName)
-                            }
+        // We should fix all signing configs as soon as they will be evaluated from build file,
+        // but before android plugin will start to add it's tasks, because it will not add correct
+        // tasks if signing config is invalid
+        project.tasks.whenTaskAdded { Task theTask ->
+            if (!isConfigsFixed) {
+                if (project.android.hasProperty("signingConfigs")) {
+                    project.android.signingConfigs.each { SigningConfig config ->
+                        if (!DEBUG.equals(config.name)) { // Skipping debug config
+                            // Setting default non-empty values
+                            config.storePassword = '-'
+                            config.keyPassword = '-'
                         }
-
-                        if (theTask.name ==~ /package${typeNameCapitalized}/) {
-                            newTaskName = addPasswordsTask(project, typeName, null)
-                        }
-
-                        if (newTaskName != null) theTask.dependsOn newTaskName
                     }
                 }
+
+                isConfigsFixed = true
+                project.logger.lifecycle "Task added ${theTask.name}"
             }
+        }
+
+        project.afterEvaluate {
+            addSignTasks project
         }
     }
 
-    static String addPasswordsTask(Project project, String typeName, String flavorName) {
-        final String taskName = (flavorName == null ? "" : flavorName.capitalize()) + typeName.capitalize()
-        final String fullTaskName = "askForPasswords${taskName}"
+    private static void addSignTasks(Project project) {
+        project.android.applicationVariants.each { ApplicationVariant variant ->
+            final SigningConfig config = variant.signingConfig
 
-        final configs = project.android.signingConfigs
+            if (config == null) {
 
-        final String configName
+                project.logger.lifecycle "No signing config for variant ${variant.name}"
 
-        if (flavorName != null && configs.hasProperty(flavorName + typeName.capitalize())) {
-            configName = flavorName + typeName.capitalize()
-        } else if (flavorName != null && configs.hasProperty(flavorName)) {
-            configName = flavorName
-        } else if (configs.hasProperty(typeName)) {
-            configName = typeName
-        } else {
-            configName = null
-        }
+            } else if (!DEBUG.equals(config.name)) { // Skipping debug config
 
-        if ("debug".equals(configName)) {
-            return null; // No need to ask for passwords for debug keystore
-        }
+                String taskName = "askForPasswords${config.name.capitalize()}"
 
-        final config = configName == null ? null : configs[configName]
+                // Creating task if it was not created yet
+                if (project.getTasksByName(taskName, false).empty) {
+                    SignTask task = project.tasks.create(taskName, SignTask)
+                    task.config = config
+                }
 
-        if (config == null) {
-            println "Project does not contain config for ${taskName} " +
-                    "under \"android.signingConfigs.${taskName}\""
-            return null;
-        }
+                // Packaging tasks should depend on askForPasswords task
+                if (variant.hasProperty("outputs")) {
+                    // 0.13.+ version
+                    variant.outputs.each { output ->
+                        output.packageApplication.dependsOn taskName
+                    }
+                } else {
+                    // older version
+                    variant.packageApplication.dependsOn taskName
+                }
 
-        config.storePassword = '-'
-        config.keyPassword = '-'
-
-        project.task(fullTaskName) << {
-            char[] storePass = ''
-            char[] keyPass = ''
-
-            if (System.console() == null) {
-                // Based on https://www.timroes.de/2014/01/19/using-password-prompts-with-gradle-build-files/
-                new SwingBuilder().edt {
-                    dialog(
-                        modal: true, // Otherwise the build will continue running before you closed the dialog
-                        title: "${taskName} keystore passwords", // Dialog title
-                        alwaysOnTop: true, // pretty much what the name says
-                        resizable: false, // Don't allow the user to resize the dialog
-                        locationRelativeTo: null, // Place dialog in center of the screen
-                        pack: true, // We need to pack the dialog (so it will take the size of it's children)
-                        show: true // Let's show it
-                        ) {
-                        vbox { // Put everything below each other
-                            label(text: "Keystore password:")
-                            passwordField(id: 'storePassInput')
-                            label(text: "(${config.storeFile.getPath()})")
-                            label(text: " ")
-                            label(text: "Key password for '${config.keyAlias}':")
-                            passwordField(id: 'keyPassInput')
-                            label(text: "(leave empty for same as keystore)")
-                            label(text: " ")
-                            button(defaultButton: true, text: 'OK', actionPerformed: {
-                                storePass = storePassInput.password; // Set pass variable to value of input field
-                                keyPass = keyPassInput.password;
-                                dispose(); // Close dialog
-                            })
-                        } // vbox end
-                    } // dialog end
-                } // edt end
-            } else {
-                System.console().println("\nKeystore file: ${config.storeFile.getPath()}");
-                storePass = System.console().readPassword("\n${taskName} keystore password:\n")
-                keyPass = System.console().readPassword("${taskName} password for key \"${config.keyAlias}\"" +
-                        " (leave empty for same as keystore):\n")
             }
-
-            config.storePassword = new String(storePass)
-            config.keyPassword = keyPass == null || keyPass.length == 0 ? new String(storePass) : new String(keyPass)
         }
-
-        return fullTaskName
     }
 
 }
