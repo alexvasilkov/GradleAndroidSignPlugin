@@ -11,6 +11,7 @@ import org.gradle.api.tasks.StopExecutionException
 class AndroidSignPlugin implements Plugin<Project> {
 
     private static final String DEBUG = "debug"
+    private static final Map<String, SigningConfig> CONFIGS = new HashMap<>()
 
     @Override
     void apply(Project project) {
@@ -28,6 +29,7 @@ class AndroidSignPlugin implements Plugin<Project> {
                 if (project.android.hasProperty("signingConfigs")) {
                     project.android.signingConfigs.each { SigningConfig config ->
                         if (!DEBUG.equals(config.name)) { // Skipping debug config
+                            CONFIGS.put(config.name, config) // Caching writable configs
                             // Setting default non-empty values
                             config.storePassword = '-'
                             config.keyPassword = '-'
@@ -36,7 +38,6 @@ class AndroidSignPlugin implements Plugin<Project> {
                 }
 
                 isConfigsFixed = true
-                project.logger.lifecycle "Task added ${theTask.name}"
             }
         }
 
@@ -47,7 +48,8 @@ class AndroidSignPlugin implements Plugin<Project> {
 
     private static void addSignTasks(Project project) {
         project.android.applicationVariants.each { ApplicationVariant variant ->
-            final SigningConfig config = variant.signingConfig
+            final SigningConfig configRO = variant.signingConfig // Configs are read-only since 0.14
+            final SigningConfig config = CONFIGS.get(configRO.name)
 
             if (config == null) {
 
