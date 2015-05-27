@@ -1,4 +1,4 @@
-AndroidGradleSignPlugin
+GradleAndroidSignPlugin
 =======================
 
 [![Maven Central](https://maven-badges.herokuapp.com/maven-central/com.alexvasilkov/android-sign-release/badge.svg)](https://maven-badges.herokuapp.com/maven-central/com.alexvasilkov/android-sign-release)
