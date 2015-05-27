@@ -1,4 +1,4 @@
-package com.alexvasilkov
+package com.alexvasilkov.sign
 
 import com.android.annotations.NonNull
 import com.android.builder.model.SigningConfig

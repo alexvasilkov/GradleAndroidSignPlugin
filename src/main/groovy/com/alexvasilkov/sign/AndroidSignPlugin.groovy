@@ -1,4 +1,4 @@
-package com.alexvasilkov
+package com.alexvasilkov.sign
 
 import com.android.build.gradle.AppPlugin
 import com.android.build.gradle.api.ApplicationVariant
